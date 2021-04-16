@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity ^0.5.0;
 
-import {FlashLoan} from './FlashLoan.sol';
+import './IFlashLoan.sol';
 
 /**
  * @title IFlashLoanReceiver interface
@@ -18,5 +18,5 @@ interface IFlashLoanReceiver {
     bytes calldata params
   ) external returns (bool);
 
-  function FLASHLOAN_POOL() external view returns (FlashLoan);
+  function FLASHLOAN_POOL() external view returns (IFlashLoan);
 }

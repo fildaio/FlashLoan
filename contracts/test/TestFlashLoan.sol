@@ -2,12 +2,15 @@
 pragma solidity ^0.5.0;
 
 import "../FlashLoanReceiverBase.sol";
+import "../dependency.sol";
 
 contract TestFlashLoan is FlashLoanReceiverBase {
+    using SafeMath for uint256;
+    using SafeERC20 for IERC20;
 
     address public governance;
 
-    constructor(FlashLoan _flashLoan, address _governance) public FlashLoanReceiverBase(_flashLoan) {
+    constructor(IFlashLoan _flashLoan, address _governance) public FlashLoanReceiverBase(_flashLoan) {
         governance = _governance;
     }
 
@@ -18,6 +21,7 @@ contract TestFlashLoan is FlashLoanReceiverBase {
         address initiator,
         bytes calldata params
     ) external returns (bool) {
+        params;
         require(initiator == governance, "initiator is not governance.");
         require(msg.sender == address(FLASHLOAN_POOL), "caller is not flash loan contract");
 
