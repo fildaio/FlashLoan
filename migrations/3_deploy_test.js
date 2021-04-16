@@ -1,8 +1,8 @@
 const TestFlashLoan = artifacts.require("TestFlashLoan");
-const FlashLoanProxy = artifacts.require("FlashLoanProxy");
+const FlashLoan = artifacts.require("FlashLoan");
 
 module.exports = async function (deployer, network, accounts) {
-    const flashloan = await FlashLoanProxy.deployed();
+    const flashloan = await FlashLoan.deployed();
     await deployer.deploy(TestFlashLoan, flashloan.address,
         "0x" // _governance
         );

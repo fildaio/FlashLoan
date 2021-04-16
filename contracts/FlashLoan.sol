@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.22 <0.8.0;
 
-import './UpgradeSource.sol';
+import './Governable.sol';
 import './FlashLoanStorage.sol';
 import './IFlashLoan.sol';
 import './IFlashLoanReceiver.sol';
 import './compound/CTokenInterfaces.sol';
 import './compound/Comptroller.sol';
+import './dependency.sol';
 
-contract FlashLoan is UpgradeSource, IFlashLoan, FlashLoanStorage {
+contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
-
-    uint256 constant FLASH_LOAN_VERSION = 1;
 
     modifier whenNotPaused() {
         _whenNotPaused();
@@ -23,8 +22,7 @@ contract FlashLoan is UpgradeSource, IFlashLoan, FlashLoanStorage {
         require(!_paused, "FlashLoan: flash loan is paused!");
     }
 
-    function initialize(address _governance, address comptroller) public initializer {
-        UpgradeSource.initialize(_governance);
+    constructor(address _governance, address comptroller) public Governable(_governance) {
         _comptroller = Comptroller(comptroller);
         _flashLoanPremiumTotal = 10;
         _maxNumberOfReserves = 128;
