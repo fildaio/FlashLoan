@@ -75,7 +75,6 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
 
             IERC20(assets[vars.i]).safeTransfer(receiverAddress, amounts[vars.i]);
         }
-        enterMarket(_securityReserve.fTokenAddress);
 
         require(
             vars.receiver.executeOperation(assets, amounts, premiums, msg.sender, params),
@@ -115,7 +114,6 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
                 vars.currentPremium
             );
         }
-        exitMarket(_securityReserve.fTokenAddress);
     }
 
     /**
@@ -168,28 +166,25 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
 
     /**
      * @dev Initializes a reserve, activating it, assigning a fToken and underlying tokens
-     * @param asset The address of the underlying asset of the reserve
-     * @param fTokenAddress The address of the fToken
+     * @param assets The address list of the underlying asset of the reserve
+     * @param fTokenAddresses The address list of the fToken
      **/
     function initReserve(
-        address asset,
-        address fTokenAddress,
-        uint256 ftokenAmount
+        address[] calldata assets,
+        address[] calldata fTokenAddresses
     ) external onlyGovernance {
-        require(Address.isContract(asset), "FlashLoan: asset address is not contract");
-        require(_reserves[asset].fTokenAddress == address(0), "FlashLoan: reserve already initialized.");
-        require(fTokenAddress != _securityReserve.fTokenAddress, "FlashLoan: reserve can not be security token");
+        for (uint8 i = 0; i < assets.length; i++) {
+            address asset = assets[i];
+            require(Address.isContract(asset), "FlashLoan: asset address is not contract");
+            require(_reserves[asset].fTokenAddress == address(0), "FlashLoan: reserve already initialized.");
 
-        if (ftokenAmount > 0) {
-            IERC20(fTokenAddress).safeTransferFrom(msg.sender, address(this), ftokenAmount);
-            //enterMarket(_reserves[asset].fTokenAddress);
+            enterMarket(fTokenAddresses[i]);
+
+            _reserves[asset].fTokenAddress = fTokenAddresses[i];
+            _reserves[asset].tokenAddress = asset;
+
+            _addReserveToList(asset);
         }
-
-        _reserves[asset].ftokenAmount = _reserves[asset].ftokenAmount.add(ftokenAmount);
-        _reserves[asset].fTokenAddress = fTokenAddress;
-        _reserves[asset].tokenAddress = asset;
-
-        _addReserveToList(asset);
     }
 
     /**
@@ -200,9 +195,9 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
     function getReserveData(address asset)
         external
         view
-        returns (address, uint256, uint8)
+        returns (address, uint8)
     {
-        return (_reserves[asset].fTokenAddress, _reserves[asset].ftokenAmount, _reserves[asset].id);
+        return (_reserves[asset].fTokenAddress, _reserves[asset].id);
     }
 
 
@@ -239,7 +234,7 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
         _comptroller = Comptroller(comptroller);
     }
 
-    function enterMarket(address ftoken) public onlyGovernance {
+    function enterMarket(address ftoken) internal {
         if (_comptroller.checkMembership(address(this), CToken(ftoken))) {
             return;
         }
@@ -257,22 +252,5 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
 
         uint err = _comptroller.exitMarket(ftoken);
         require(err == 0, "FlashLoan: exit market error");
-    }
-
-    function initSecurityReserve(
-        address asset,
-        address fTokenAddress,
-        uint256 ftokenAmount
-    ) external onlyGovernance {
-        require(Address.isContract(asset), "FlashLoan: asset address is not contract");
-
-        if (ftokenAmount > 0) {
-            IERC20(fTokenAddress).safeTransferFrom(msg.sender, address(this), ftokenAmount);
-            exitMarket(fTokenAddress);
-        }
-
-        _securityReserve.ftokenAmount = _securityReserve.ftokenAmount.add(ftokenAmount);
-        _securityReserve.fTokenAddress = fTokenAddress;
-        _securityReserve.tokenAddress = asset;
     }
 }

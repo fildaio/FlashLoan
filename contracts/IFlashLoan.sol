@@ -31,13 +31,12 @@ interface IFlashLoan {
 
     /**
      * @dev Initializes a reserve, activating it, assigning a fToken and underlying tokens
-     * @param asset The address of the underlying asset of the reserve
-     * @param fTokenAddress The address of the fToken
+     * @param assets The address list of the underlying asset of the reserve
+     * @param fTokenAddresses The address list of the fToken
      **/
     function initReserve(
-        address asset,
-        address fTokenAddress,
-        uint256 ftokenAmount
+        address[] calldata assets,
+        address[] calldata fTokenAddresses
     ) external;
 
     /**
@@ -48,7 +47,7 @@ interface IFlashLoan {
     function getReserveData(address asset)
         external
         view
-        returns (address, uint256, uint8);
+        returns (address, uint8);
 
     /**
      * @dev Allows smartcontracts to access the liquidity of the pool within one transaction,
@@ -79,10 +78,4 @@ interface IFlashLoan {
     function getComptroller() external view returns (address);
 
     function setComptroller(address comptroller) external;
-
-    function initSecurityReserve(
-        address asset,
-        address fTokenAddress,
-        uint256 ftokenAmount
-    ) external;
 }
