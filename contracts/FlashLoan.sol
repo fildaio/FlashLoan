@@ -9,7 +9,7 @@ import './compound/CTokenInterfaces.sol';
 import './compound/Comptroller.sol';
 import './dependency.sol';
 
-contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable {
+contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -30,7 +30,6 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable {
 
     struct FlashLoanLocalVars {
         IFlashLoanReceiver receiver;
-        bool borrowed;
         uint256 i;
         address currentAsset;
         address currentFTokenAddress;
@@ -63,24 +62,14 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable {
 
         address[] memory fTokenAddresses = new address[](assets.length);
         uint256[] memory premiums = new uint256[](assets.length);
-        bool[] memory borrowed = new bool[](assets.length);
 
         vars.receiver = IFlashLoanReceiver(receiverAddress);
 
         for (vars.i = 0; vars.i < assets.length; vars.i++) {
             fTokenAddresses[vars.i] = _reserves[assets[vars.i]].fTokenAddress;
 
-            uint256 underlyingAmount = CTokenInterface(fTokenAddresses[vars.i]).exchangeRateCurrent()
-                    .mul(IERC20(fTokenAddresses[vars.i]).balanceOf(address(this))).div(1e18);
-            if (underlyingAmount < amounts[vars.i]) {
-                borrowed[vars.i] = true;
-                err = CErc20Interface(fTokenAddresses[vars.i]).borrow(amounts[vars.i]);
-                require(err == 0, "FlashLoan: borrow error");
-            } else {
-                borrowed[vars.i] = false;
-                err = CErc20Interface(fTokenAddresses[vars.i]).redeemUnderlying(amounts[vars.i]);
-                require(err == 0, "FlashLoan: redeemUnderlying error");
-            }
+            err = CToken(fTokenAddresses[vars.i]).borrow(amounts[vars.i]);
+            require(err == 0, "FlashLoan: borrow error");
 
             premiums[vars.i] = amounts[vars.i].mul(_flashLoanPremiumTotal).div(10000);
 
@@ -94,7 +83,6 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable {
         );
 
         for (vars.i = 0; vars.i < assets.length; vars.i++) {
-            vars.borrowed = borrowed[vars.i];
             vars.currentAsset = assets[vars.i];
             vars.currentAmount = amounts[vars.i];
             vars.currentPremium = premiums[vars.i];
@@ -107,18 +95,17 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable {
                 vars.currentAmountPlusPremium
             );
 
-            uint256 mintAmount = vars.currentAmountPlusPremium;
-            IERC20(vars.currentAsset).safeApprove(vars.currentFTokenAddress, vars.currentAmountPlusPremium);
-            if (vars.borrowed) {
-                uint256 borrowBalance = CTokenInterface(vars.currentFTokenAddress).borrowBalanceCurrent(address(this));
-                err = CErc20Interface(vars.currentFTokenAddress).repayBorrow(borrowBalance);
-                require(err == 0, "FlashLoan: repayBorrow error");
 
-                mintAmount = vars.currentAmountPlusPremium.sub(borrowBalance);
-            }
+            // repay loan.
+            uint256 borrowBalance = CToken(vars.currentFTokenAddress).borrowBalanceCurrent(address(this));
+            IERC20(vars.currentAsset).safeApprove(vars.currentFTokenAddress, 0);
+            IERC20(vars.currentAsset).safeApprove(vars.currentFTokenAddress, borrowBalance);
 
-            err = CErc20Interface(vars.currentFTokenAddress).mint(mintAmount);
-            require(err == 0, "FlashLoan: mint error");
+            err = CToken(vars.currentFTokenAddress).repayBorrow(borrowBalance);
+            require(err == 0, "FlashLoan: repayBorrow error");
+
+            // send premium to owner.
+            IERC20(vars.currentAsset).safeTransfer(owner(), vars.currentAmountPlusPremium.sub(borrowBalance));
 
             emit FlashLoan(
                 receiverAddress,
@@ -234,14 +221,13 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable {
         }
     }
 
-    function withdrawERC20(address _token, address _account, uint256 amount) public onlyGovernance returns (uint256) {
+    function withdrawERC20(address _token, address _account, uint256 amount) public onlyOwner {
         require(_token != address(0) && _account != address(0) && amount > 0, "FlashLoan: Invalid parameter");
         IERC20 token = IERC20(_token);
         if (amount > token.balanceOf(address(this))) {
             amount = token.balanceOf(address(this));
         }
         token.safeTransfer(_account, amount);
-        return amount;
     }
 
     function getComptroller() external view returns (address) {
