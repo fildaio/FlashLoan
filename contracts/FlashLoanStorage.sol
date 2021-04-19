@@ -2,6 +2,7 @@
 pragma solidity >=0.4.22 <0.8.0;
 
 import "./compound/Comptroller.sol";
+import "./oracle/ChainlinkAdaptor.sol";
 
 contract FlashLoanStorage {
 
@@ -27,4 +28,8 @@ contract FlashLoanStorage {
     uint256 internal _maxNumberOfReserves;
 
     Comptroller internal _comptroller;
+
+    ChainlinkAdaptor internal _oracle;
+
+    address internal _fHUSD;
 }

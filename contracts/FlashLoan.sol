@@ -8,6 +8,11 @@ import './IFlashLoanReceiver.sol';
 import './compound/CTokenInterfaces.sol';
 import './compound/Comptroller.sol';
 import './dependency.sol';
+import './oracle/ChainlinkAdaptor.sol';
+
+contract IERC20Extented is IERC20 {
+    function decimals() public view returns (uint8);
+}
 
 contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
     using SafeMath for uint256;
@@ -22,8 +27,10 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
         require(!_paused, "FlashLoan: flash loan is paused!");
     }
 
-    constructor(address _governance, address comptroller) public Governable(_governance) {
+    constructor(address _governance, address comptroller, address oracle, address fHUSD) public Governable(_governance) {
         _comptroller = Comptroller(comptroller);
+        _oracle = ChainlinkAdaptor(oracle);
+        _fHUSD = fHUSD;
         _flashLoanPremiumTotal = 10;
         _maxNumberOfReserves = 128;
     }
@@ -66,6 +73,9 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
         vars.receiver = IFlashLoanReceiver(receiverAddress);
 
         for (vars.i = 0; vars.i < assets.length; vars.i++) {
+            uint256 maxTokenAmount = getMaxTokenAmount(assets[vars.i]);
+            require(amounts[vars.i] <= maxTokenAmount, "FlashLoan: Insufficient liquidity");
+
             fTokenAddresses[vars.i] = _reserves[assets[vars.i]].fTokenAddress;
 
             err = CToken(fTokenAddresses[vars.i]).borrow(amounts[vars.i]);
@@ -252,5 +262,45 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
 
         uint err = _comptroller.exitMarket(ftoken);
         require(err == 0, "FlashLoan: exit market error");
+    }
+
+    function getLiquidity() public returns (uint256) {
+        (uint error, uint256 liquidity, uint shortfall) = _comptroller.getAccountLiquidity(address(this));
+        if (error != 0 || shortfall != 0) {
+            return 0;
+        }
+
+        return liquidity.mul(getHtPrice()).div(1e18);
+    }
+
+    function getOracle() external view returns (address) {
+        return address(_oracle);
+    }
+
+    function setOracle(address oracle) external onlyGovernance {
+        require(Address.isContract(oracle), "FlashLoan: oracle address is not contract");
+        _oracle = ChainlinkAdaptor(oracle);
+    }
+
+    function getMaxTokenAmount(address asset) public returns (uint256) {
+        require(Address.isContract(asset), "FlashLoan: asset address is not contract");
+        require(_reserves[asset].fTokenAddress != address(0), "FlashLoan: this asset is not surpported");
+
+        uint256 liquidity = getLiquidity();
+        if (liquidity == 0) {
+            return 0;
+        }
+
+        uint256 husdHTPrice = _oracle.getUnderlyingPrice(CToken(_fHUSD));
+        uint256 tokenHTPrice = _oracle.getUnderlyingPrice(CToken(_reserves[asset].fTokenAddress));
+
+        uint256 decimals = IERC20Extented(asset).decimals();
+        uint256 tokenPrice = tokenHTPrice.mul(10**decimals).div(husdHTPrice);
+
+        return liquidity.mul(10**decimals).mul(99).div(100).div(tokenPrice);
+    }
+
+    function getHtPrice() private view returns (uint256) {
+        return uint256(1e36).div(_oracle.getUnderlyingPrice(CToken(_fHUSD)));
     }
 }

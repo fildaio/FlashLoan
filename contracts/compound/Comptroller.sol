@@ -5,4 +5,6 @@ import "./CToken.sol";
 
 contract Comptroller is ComptrollerInterface {
     function checkMembership(address account, CToken cToken) external view returns (bool);
+
+    function getAccountLiquidity(address account) external view returns (uint, uint, uint);
 }
