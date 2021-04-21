@@ -297,7 +297,7 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
         uint256 decimals = IERC20Extented(asset).decimals();
         uint256 tokenPrice = tokenHTPrice.mul(10**decimals).div(husdHTPrice);
 
-        return liquidity.mul(10**decimals).mul(99).div(100).div(tokenPrice);
+        return liquidity.sub(1e8).mul(10**decimals).div(tokenPrice);
     }
 
     function getHtPrice() private view returns (uint256) {
