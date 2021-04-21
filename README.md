@@ -16,7 +16,7 @@ For developers, a helpful mental model to consider when developing your solution
 
 ## Step by step
 
-1. Setting up
+### 1. Setting up
 
 Your contract that receives the flash loaned amounts must conform to the **IFlashLoanReceiver** interface by implementing the relevant executeOperation() function. In the example below, we inherit from **FlashLoanReceiverBase**, which conforms to the **IFlashLoanReceiver**.
 
@@ -78,7 +78,7 @@ contract MyFlashLoan is FlashLoanReceiverBase {
 }
 ```
 
-2. Calling flashLoan()
+### 2. Calling flashLoan()
 
 To call flashloan() on the **FlashLoan** contract, we need to pass in the relevant parameters. There are 3 ways you can do this.
 
@@ -95,6 +95,9 @@ Similar to sending a transaction as above, ensure the receiverAddress is your co
 
 If you want to use the same contract as in step 1, use address(this) for the receiverAddress parameter in the flashLoan function.
 The example below shows this third case, where the executeOperation() is in the same contract calling flashLoan() on the **FlashLoan** contract.
+
+> [!WARNING]
+> Never keep funds permanently on your FlashLoanReceiverBase contract as they could be exposed to a 'griefing' attack, where the stored funds are used by an attacker.
 
 ```
 pragma solidity ^0.5.0;
@@ -173,7 +176,7 @@ contract MyFlashLoan is FlashLoanReceiverBase {
 }
 ```
 
-3. Completing the flash loan
+### 3. Completing the flash loan
 
 Once you have performed your logic with the flash loaned assets (in your executeOperation() function), you will need to pay back the flash loaned amounts.
 
