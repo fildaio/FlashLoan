@@ -7,6 +7,7 @@ import './IFlashLoan.sol';
 import './IFlashLoanReceiver.sol';
 import './compound/CTokenInterfaces.sol';
 import './compound/Comptroller.sol';
+import './compound/CEther.sol';
 import './dependency.sol';
 import './oracle/ChainlinkAdaptor.sol';
 
@@ -17,6 +18,7 @@ contract IERC20Extented is IERC20 {
 contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
+    using SafeERC20 for WETH;
 
     modifier whenNotPaused() {
         _whenNotPaused();
@@ -27,10 +29,11 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
         require(!_paused, "FlashLoan: flash loan is paused!");
     }
 
-    constructor(address _governance, address comptroller, address oracle, address fHUSD) public Governable(_governance) {
+    constructor(address _governance, address comptroller, address oracle, address fHUSD, address weth) public Governable(_governance) {
         _comptroller = Comptroller(comptroller);
         _oracle = ChainlinkAdaptor(oracle);
         _fHUSD = fHUSD;
+        _WETH = WETH(weth);
         _flashLoanPremiumTotal = 10;
         _maxNumberOfReserves = 128;
     }
@@ -78,8 +81,12 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
 
             fTokenAddresses[vars.i] = _reserves[assets[vars.i]].fTokenAddress;
 
-            err = CToken(fTokenAddresses[vars.i]).borrow(amounts[vars.i]);
-            require(err == 0, "FlashLoan: borrow error");
+            if (assets[vars.i] == address(_WETH)) {
+                borrowETH(fTokenAddresses[vars.i], amounts[vars.i]);
+            } else {
+                err = CToken(fTokenAddresses[vars.i]).borrow(amounts[vars.i]);
+                require(err == 0, "FlashLoan: borrow error");
+            }
 
             premiums[vars.i] = amounts[vars.i].mul(_flashLoanPremiumTotal).div(10000);
 
@@ -104,17 +111,26 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
                 vars.currentAmountPlusPremium
             );
 
-
-            // repay loan.
             uint256 borrowBalance = CToken(vars.currentFTokenAddress).borrowBalanceCurrent(address(this));
-            IERC20(vars.currentAsset).safeApprove(vars.currentFTokenAddress, 0);
-            IERC20(vars.currentAsset).safeApprove(vars.currentFTokenAddress, borrowBalance);
+            if (vars.currentAsset == address(_WETH)) {
+                _WETH.withdraw(vars.currentAmountPlusPremium);
 
-            err = CToken(vars.currentFTokenAddress).repayBorrow(borrowBalance);
-            require(err == 0, "FlashLoan: repayBorrow error");
+                // repay loan.
+                CEther(vars.currentFTokenAddress).repayBorrow.value(borrowBalance)();
 
-            // send premium to owner.
-            IERC20(vars.currentAsset).safeTransfer(owner(), vars.currentAmountPlusPremium.sub(borrowBalance));
+                // send premium to owner.
+                address(uint160(owner())).transfer(vars.currentAmountPlusPremium.sub(borrowBalance));
+            } else {
+                IERC20(vars.currentAsset).safeApprove(vars.currentFTokenAddress, 0);
+                IERC20(vars.currentAsset).safeApprove(vars.currentFTokenAddress, borrowBalance);
+
+                 // repay loan.
+                err = CToken(vars.currentFTokenAddress).repayBorrow(borrowBalance);
+                require(err == 0, "FlashLoan: repayBorrow error");
+
+                // send premium to owner.
+                IERC20(vars.currentAsset).safeTransfer(owner(), vars.currentAmountPlusPremium.sub(borrowBalance));
+            }
 
             emit FlashLoan(
                 receiverAddress,
@@ -124,6 +140,13 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
                 vars.currentPremium
             );
         }
+    }
+
+    function borrowETH(address cetherAddr, uint256 amount) internal {
+        uint err = CEther(cetherAddr).borrow(amount);
+        require(err == 0, "FlashLoan: borrow error");
+
+        _WETH.deposit.value(amount)();
     }
 
     /**
@@ -235,6 +258,14 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
         token.safeTransfer(_account, amount);
     }
 
+    function withdraw(address payable _account, uint256 amount) public onlyOwner {
+        require(_account != address(0) && amount > 0, "FlashLoan: Invalid parameter");
+        if (amount > address(this).balance) {
+            amount = address(this).balance;
+        }
+        _account.transfer(amount);
+    }
+
     function getComptroller() external view returns (address) {
         return address(_comptroller);
     }
@@ -264,13 +295,17 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
         require(err == 0, "FlashLoan: exit market error");
     }
 
-    function getLiquidity() public returns (uint256) {
+    function _getLiquidity() private view returns (uint256) {
         (uint error, uint256 liquidity, uint shortfall) = _comptroller.getAccountLiquidity(address(this));
         if (error != 0 || shortfall != 0) {
             return 0;
         }
 
-        return liquidity.mul(getHtPrice()).div(1e18);
+        return liquidity;
+    }
+
+    function getLiquidity() public view returns (uint256) {
+        return _getLiquidity().mul(getHtPrice()).div(1e18);
     }
 
     function getOracle() external view returns (address) {
@@ -282,9 +317,13 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
         _oracle = ChainlinkAdaptor(oracle);
     }
 
-    function getMaxTokenAmount(address asset) public returns (uint256) {
+    function getMaxTokenAmount(address asset) public view returns (uint256) {
         require(Address.isContract(asset), "FlashLoan: asset address is not contract");
         require(_reserves[asset].fTokenAddress != address(0), "FlashLoan: this asset is not surpported");
+
+        if (asset == address(_WETH)) {
+            return _getLiquidity();
+        }
 
         uint256 liquidity = getLiquidity();
         if (liquidity == 0) {
@@ -297,10 +336,16 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
         uint256 decimals = IERC20Extented(asset).decimals();
         uint256 tokenPrice = tokenHTPrice.mul(10**decimals).div(husdHTPrice);
 
-        return liquidity.sub(1e8).mul(10**decimals).div(tokenPrice);
+        return liquidity.mul(10**decimals).div(tokenPrice);
     }
 
     function getHtPrice() private view returns (uint256) {
         return uint256(1e36).div(_oracle.getUnderlyingPrice(CToken(_fHUSD)));
     }
+
+    function WETH() external view returns (address) {
+        return address(_WETH);
+    }
+
+    function () external payable {}
 }

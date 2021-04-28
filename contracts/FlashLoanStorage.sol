@@ -3,6 +3,7 @@ pragma solidity >=0.4.22 <0.8.0;
 
 import "./compound/Comptroller.sol";
 import "./oracle/ChainlinkAdaptor.sol";
+import "./WETH.sol";
 
 contract FlashLoanStorage {
 
@@ -32,4 +33,6 @@ contract FlashLoanStorage {
     ChainlinkAdaptor internal _oracle;
 
     address internal _fHUSD;
+
+    WETH internal _WETH;
 }

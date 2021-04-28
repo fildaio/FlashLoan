@@ -79,11 +79,13 @@ interface IFlashLoan {
 
     function setComptroller(address comptroller) external;
 
-    function getLiquidity() external returns (uint256);
+    function getLiquidity() external view returns (uint256);
 
-    function getMaxTokenAmount(address asset) external returns (uint256);
+    function getMaxTokenAmount(address asset) external view returns (uint256);
 
     function getOracle() external view returns (address);
 
     function setOracle(address oracle) external;
+
+    function WETH() external view returns (address);
 }

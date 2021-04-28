@@ -3,15 +3,18 @@ pragma solidity ^0.5.0;
 
 import "../FlashLoanReceiverBase.sol";
 import "../dependency.sol";
+import "../WETH.sol";
 
 contract TestFlashLoan is FlashLoanReceiverBase {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
     address public governance;
+    WETH public _WETH;
 
-    constructor(IFlashLoan _flashLoan, address _governance) public FlashLoanReceiverBase(_flashLoan) {
+    constructor(IFlashLoan _flashLoan, address _governance, address weth) public FlashLoanReceiverBase(_flashLoan) {
         governance = _governance;
+        _WETH = WETH(weth);
     }
 
     function executeOperation(
@@ -27,6 +30,11 @@ contract TestFlashLoan is FlashLoanReceiverBase {
 
         for (uint i = 0; i < assets.length; i++) {
             uint256 repay = amounts[i].add(premiums[i]);
+            if (assets[i] == address(_WETH)) {
+                _WETH.withdraw(amounts[i]);
+                _WETH.deposit.value(repay)();
+            }
+
             IERC20(assets[i]).safeApprove(address(FLASHLOAN_POOL), repay);
         }
 
@@ -42,4 +50,14 @@ contract TestFlashLoan is FlashLoanReceiverBase {
         token.safeTransfer(_account, amount);
         return amount;
     }
+
+    function withdraw(address payable _account, uint256 amount) public {
+        require(msg.sender == governance, "only governance.");
+        if (amount > address(this).balance) {
+            amount = address(this).balance;
+        }
+        _account.transfer(amount);
+    }
+
+    function () external payable {}
 }
