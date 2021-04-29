@@ -70,6 +70,8 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
 
         require(assets.length == amounts.length, "FlashLoan: invalid flash loan parameter.");
 
+        uint256 liquidity = _getLiquidity();
+
         address[] memory fTokenAddresses = new address[](assets.length);
         uint256[] memory premiums = new uint256[](assets.length);
 
@@ -88,7 +90,7 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
                 require(err == 0, "FlashLoan: borrow error");
             }
 
-            premiums[vars.i] = amounts[vars.i].mul(_flashLoanPremiumTotal).div(10000);
+            premiums[vars.i] = isInWhitelist(receiverAddress) ? 0 : amounts[vars.i].mul(_flashLoanPremiumTotal).div(10000);
 
             IERC20(assets[vars.i]).safeTransfer(receiverAddress, amounts[vars.i]);
         }
@@ -118,8 +120,10 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
                 // repay loan.
                 CEther(vars.currentFTokenAddress).repayBorrow.value(borrowBalance)();
 
-                // send premium to owner.
-                address(uint160(owner())).transfer(vars.currentAmountPlusPremium.sub(borrowBalance));
+                if (vars.currentPremium > 0) {
+                    // send premium to owner.
+                    address(uint160(owner())).transfer(vars.currentAmountPlusPremium.sub(borrowBalance));
+                }
             } else {
                 IERC20(vars.currentAsset).safeApprove(vars.currentFTokenAddress, 0);
                 IERC20(vars.currentAsset).safeApprove(vars.currentFTokenAddress, borrowBalance);
@@ -128,8 +132,10 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
                 err = CToken(vars.currentFTokenAddress).repayBorrow(borrowBalance);
                 require(err == 0, "FlashLoan: repayBorrow error");
 
-                // send premium to owner.
-                IERC20(vars.currentAsset).safeTransfer(owner(), vars.currentAmountPlusPremium.sub(borrowBalance));
+                if (vars.currentPremium > 0) {
+                    // send premium to owner.
+                    IERC20(vars.currentAsset).safeTransfer(owner(), vars.currentAmountPlusPremium.sub(borrowBalance));
+                }
             }
 
             emit FlashLoan(
@@ -140,6 +146,8 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
                 vars.currentPremium
             );
         }
+
+        require(liquidity <= _getLiquidity(), "FlashLoan: liquidity decreased!");
     }
 
     function borrowETH(address cetherAddr, uint256 amount) internal {
@@ -348,4 +356,21 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
     }
 
     function () external payable {}
+
+    function addToWhitelist(address[] calldata _targets) external onlyGovernance {
+        require(_targets.length > 0, "FlashLoan: invalid argument");
+        for (uint i = 0; i < _targets.length; i++) {
+            require(_targets[i] != address(0), "FlashLoan: whitelist can not be zero address");
+            _whitelist[_targets[i]] = true;
+        }
+    }
+
+    function removeFromWhitelist(address _target) external onlyGovernance {
+        require(_target != address(0), "FlashLoan: whitelist can not be zero address");
+        _whitelist[_target] = false;
+    }
+
+    function isInWhitelist(address _target) public view returns (bool) {
+        return _whitelist[_target];
+    }
 }

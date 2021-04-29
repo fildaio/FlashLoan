@@ -88,4 +88,10 @@ interface IFlashLoan {
     function setOracle(address oracle) external;
 
     function WETH() external view returns (address);
+
+    function addToWhitelist(address[] calldata _target) external;
+
+    function removeFromWhitelist(address _target) external;
+
+    function isInWhitelist(address _target) external view returns (bool);
 }

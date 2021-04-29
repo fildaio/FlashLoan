@@ -35,4 +35,6 @@ contract FlashLoanStorage {
     address internal _fHUSD;
 
     WETH internal _WETH;
+
+    mapping (address => bool) internal _whitelist;
 }
