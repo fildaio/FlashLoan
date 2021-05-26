@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.4.22 <0.8.0;
+pragma solidity ^0.5.0;
 
 interface IFlashLoan {
     /**
@@ -11,6 +11,14 @@ interface IFlashLoan {
     * @dev Emitted when the pause is lifted.
     */
     event Unpaused();
+
+    /**
+    * @dev Emitted when the oracle contract address is changed.
+    */
+    event OracleChanged(
+        address indexed from,
+        address indexed to
+    );
 
 
     /**

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.4.22 <0.8.0;
+pragma solidity ^0.5.0;
 
 import './Governable.sol';
 import './FlashLoanStorage.sol';
@@ -322,7 +322,11 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
 
     function setOracle(address oracle) external onlyGovernance {
         require(Address.isContract(oracle), "FlashLoan: oracle address is not contract");
+
+        address from = address(_oracle);
         _oracle = ChainlinkAdaptor(oracle);
+
+        emit OracleChanged(from, oracle);
     }
 
     function getMaxTokenAmount(address asset) public view returns (uint256) {
