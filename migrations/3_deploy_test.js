@@ -4,7 +4,8 @@ const FlashLoan = artifacts.require("FlashLoan");
 module.exports = async function (deployer, network, accounts) {
     const flashloan = await FlashLoan.deployed();
     await deployer.deploy(TestFlashLoan, flashloan.address,
-        "0x" // _governance
+        '0x', // _governance
+        '0x' // WHT
         );
 
     console.log("***********************************************");

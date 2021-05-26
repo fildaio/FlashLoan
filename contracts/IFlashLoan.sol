@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.4.22 <0.8.0;
+pragma solidity ^0.5.0;
 
 interface IFlashLoan {
     /**
@@ -11,6 +11,14 @@ interface IFlashLoan {
     * @dev Emitted when the pause is lifted.
     */
     event Unpaused();
+
+    /**
+    * @dev Emitted when the oracle contract address is changed.
+    */
+    event OracleChanged(
+        address indexed from,
+        address indexed to
+    );
 
 
     /**
@@ -79,11 +87,19 @@ interface IFlashLoan {
 
     function setComptroller(address comptroller) external;
 
-    function getLiquidity() external returns (uint256);
+    function getLiquidity() external view returns (uint256);
 
-    function getMaxTokenAmount(address asset) external returns (uint256);
+    function getMaxTokenAmount(address asset) external view returns (uint256);
 
     function getOracle() external view returns (address);
 
     function setOracle(address oracle) external;
+
+    function WETH() external view returns (address);
+
+    function addToWhitelist(address[] calldata _target) external;
+
+    function removeFromWhitelist(address _target) external;
+
+    function isInWhitelist(address _target) external view returns (bool);
 }
