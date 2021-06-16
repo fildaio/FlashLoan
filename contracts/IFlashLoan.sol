@@ -97,7 +97,7 @@ interface IFlashLoan {
 
     function WETH() external view returns (address);
 
-    function addToWhitelist(address[] calldata _target) external;
+    function addToWhitelist(address[] calldata _target, uint256[] calldata premiums) external;
 
     function removeFromWhitelist(address _target) external;
 

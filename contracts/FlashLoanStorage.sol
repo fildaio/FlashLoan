@@ -15,6 +15,11 @@ contract FlashLoanStorage {
         uint8 id;
     }
 
+    struct WhiteListData {
+        bool isInWhiteLis;
+        uint256 premium;
+    }
+
     mapping(address => ReserveData) internal _reserves;
 
     // the list of the available reserves, structured as a mapping for gas savings reasons
@@ -36,5 +41,5 @@ contract FlashLoanStorage {
 
     WETH internal _WETH;
 
-    mapping (address => bool) internal _whitelist;
+    mapping (address => WhiteListData) internal _whitelist;
 }
