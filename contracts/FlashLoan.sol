@@ -380,4 +380,12 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
     function isInWhitelist(address _target) public view returns (bool) {
         return _whitelist[_target].isInWhiteLis;
     }
+
+    function getPremium(address _target) external view returns (uint256) {
+        if (isInWhitelist(_target)) {
+            return _whitelist[_target].premium;
+        }
+
+        return FLASHLOAN_PREMIUM_TOTAL();
+    }
 }

@@ -102,4 +102,6 @@ interface IFlashLoan {
     function removeFromWhitelist(address _target) external;
 
     function isInWhitelist(address _target) external view returns (bool);
+
+    function getPremium(address _target) external view returns (uint256);
 }
