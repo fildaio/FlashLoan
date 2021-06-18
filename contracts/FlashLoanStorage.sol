@@ -16,7 +16,7 @@ contract FlashLoanStorage {
     }
 
     struct WhiteListData {
-        bool isInWhiteLis;
+        bool isInWhiteList;
         uint256 premium;
     }
 

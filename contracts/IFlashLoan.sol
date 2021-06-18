@@ -20,6 +20,20 @@ interface IFlashLoan {
         address indexed to
     );
 
+    /**
+    * @dev Emitted when the whitelist added or premium changed.
+    */
+    event WhitelistChanged(
+        address[] list,
+        uint256[] premiums
+    );
+
+    /**
+    * @dev Emitted when the target removed form whitelist .
+    */
+    event WhitelistRemoved(
+        address indexed target
+    );
 
     /**
      * @dev Emitted on flashLoan()

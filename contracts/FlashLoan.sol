@@ -367,18 +367,22 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
         require(_targets.length > 0 && _targets.length == premiums.length, "FlashLoan: invalid argument");
         for (uint i = 0; i < _targets.length; i++) {
             require(_targets[i] != address(0), "FlashLoan: whitelist can not be zero address");
-            _whitelist[_targets[i]].isInWhiteLis = true;
+            _whitelist[_targets[i]].isInWhiteList = true;
             _whitelist[_targets[i]].premium = premiums[i];
         }
+
+        emit WhitelistChanged(_targets, premiums);
     }
 
     function removeFromWhitelist(address _target) external onlyGovernance {
         require(_target != address(0), "FlashLoan: whitelist can not be zero address");
-        _whitelist[_target].isInWhiteLis = false;
+        _whitelist[_target].isInWhiteList = false;
+
+        emit WhitelistRemoved(_target);
     }
 
     function isInWhitelist(address _target) public view returns (bool) {
-        return _whitelist[_target].isInWhiteLis;
+        return _whitelist[_target].isInWhiteList;
     }
 
     function getPremium(address _target) external view returns (uint256) {
