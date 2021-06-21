@@ -20,6 +20,20 @@ interface IFlashLoan {
         address indexed to
     );
 
+    /**
+    * @dev Emitted when the whitelist added or premium changed.
+    */
+    event WhitelistChanged(
+        address[] list,
+        uint256[] premiums
+    );
+
+    /**
+    * @dev Emitted when the target removed form whitelist .
+    */
+    event WhitelistRemoved(
+        address indexed target
+    );
 
     /**
      * @dev Emitted on flashLoan()
@@ -97,9 +111,11 @@ interface IFlashLoan {
 
     function WETH() external view returns (address);
 
-    function addToWhitelist(address[] calldata _target) external;
+    function addToWhitelist(address[] calldata _target, uint256[] calldata premiums) external;
 
     function removeFromWhitelist(address _target) external;
 
     function isInWhitelist(address _target) external view returns (bool);
+
+    function getPremium(address _target) external view returns (uint256);
 }

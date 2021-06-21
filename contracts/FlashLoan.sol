@@ -90,7 +90,9 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
                 require(err == 0, "FlashLoan: borrow error");
             }
 
-            premiums[vars.i] = isInWhitelist(receiverAddress) ? 0 : amounts[vars.i].mul(_flashLoanPremiumTotal).div(10000);
+            uint256 premiumTotal = isInWhitelist(receiverAddress) ? _whitelist[receiverAddress].premium : _flashLoanPremiumTotal;
+
+            premiums[vars.i] = amounts[vars.i].mul(premiumTotal).div(10000);
 
             IERC20(assets[vars.i]).safeTransfer(receiverAddress, amounts[vars.i]);
         }
@@ -361,20 +363,33 @@ contract FlashLoan is IFlashLoan, FlashLoanStorage, Governable, Ownable {
 
     function () external payable {}
 
-    function addToWhitelist(address[] calldata _targets) external onlyGovernance {
-        require(_targets.length > 0, "FlashLoan: invalid argument");
+    function addToWhitelist(address[] calldata _targets, uint256[] calldata premiums) external onlyGovernance {
+        require(_targets.length > 0 && _targets.length == premiums.length, "FlashLoan: invalid argument");
         for (uint i = 0; i < _targets.length; i++) {
             require(_targets[i] != address(0), "FlashLoan: whitelist can not be zero address");
-            _whitelist[_targets[i]] = true;
+            _whitelist[_targets[i]].isInWhiteList = true;
+            _whitelist[_targets[i]].premium = premiums[i];
         }
+
+        emit WhitelistChanged(_targets, premiums);
     }
 
     function removeFromWhitelist(address _target) external onlyGovernance {
         require(_target != address(0), "FlashLoan: whitelist can not be zero address");
-        _whitelist[_target] = false;
+        _whitelist[_target].isInWhiteList = false;
+
+        emit WhitelistRemoved(_target);
     }
 
     function isInWhitelist(address _target) public view returns (bool) {
-        return _whitelist[_target];
+        return _whitelist[_target].isInWhiteList;
+    }
+
+    function getPremium(address _target) external view returns (uint256) {
+        if (isInWhitelist(_target)) {
+            return _whitelist[_target].premium;
+        }
+
+        return FLASHLOAN_PREMIUM_TOTAL();
     }
 }
